@@ -127,7 +127,7 @@ class FssDirectoryManager(QObject):
             self.fileDeleted.emit(i)
             self.dirfiles.remove(i);
             print "removing: ", i
- 
+  
         for i in newFiles:
             self.fileModified.emit(i)
             self.dirfiles.append(i)

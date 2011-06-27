@@ -20,6 +20,7 @@ class FssCentralServer (QObject):
             self.connections.remove(clientConnection)
 
 <<<<<<< HEAD
+<<<<<<< HEAD
         def processRFileChangedRecieved(data):
             fileName=data.takeFirst()
             fileData=self.fileMonitor.getFileContents(fileName)
@@ -30,6 +31,8 @@ class FssCentralServer (QObject):
                 dataPacket.append (QString(fileData.toBase64()))        
                 clientConnection.writeOutgoing(dataPacket)
 
+=======
+>>>>>>> parent of ed9d4f1... new file interchange successful - modification unsuccessful
 =======
 >>>>>>> parent of ed9d4f1... new file interchange successful - modification unsuccessful
         clientConnection=ClientConnection(self.centralServer.nextPendingConnection())
