@@ -16,9 +16,8 @@ class FssClient (QObject):
                 dataPacket=QStringList()
                 dataPacket.append ("d.FILE.CHANGED")
                 dataPacket.append (fileName)
-                dataPacket.append (QString(fileData.toBase64()))        
+                dataPacket.append (fileData)        
                 self.connection.writeOutgoing(dataPacket)
-
 
         self.fileMonitor = FssDirectoryManager(homeDir);
         self.clientSocket = QTcpSocket()
@@ -28,8 +27,6 @@ class FssClient (QObject):
         self.connection.requestFileChangedRecieved.connect(processRFileChangedRecieved)
         
         self.connection.dataFileChangedRecieved.connect( self.fileMonitor.writeRecievedModifications)
-
-
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description="FShSyServer")

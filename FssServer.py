@@ -20,14 +20,14 @@ class FssCentralServer (QObject):
 
         def processRFileChangedRecieved(data):
             fileName=data.takeFirst()
+            print "Requested File= ", fileName
             fileData=self.fileMonitor.getFileContents(fileName)
-            if(fileData):
+            if(fileData!=None):
                 dataPacket=QStringList()
                 dataPacket.append ("d.FILE.CHANGED")
                 dataPacket.append (fileName)
-                dataPacket.append (QString(fileData.toBase64()))        
+                dataPacket.append (fileData)        
                 clientConnection.writeOutgoing(dataPacket)
-
 
         clientConnection=ClientConnection(self.centralServer.nextPendingConnection())
         clientConnection.disconnected.connect(deleteConnection)

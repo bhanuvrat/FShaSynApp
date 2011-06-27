@@ -25,17 +25,17 @@ class ClientConnection (QObject):
         self.disconnected.emit()
 
     def readIncoming(self):
-        print "Alert: Data Avaiable for Reading"
+        #print "Alert: Data Avaiable for Reading"
         readStream=QDataStream(self.socket)
         if (self.socket.bytesAvailable() < 2):
             return
         size=readStream.readUInt16()
         for i in range(0,10):
             if(self.socket.bytesAvailable() >= size):
-                print 'Alert: got it'
+                #print 'Alert: got it'
                 break
             else:
-                print "Alert: Waiting for data. Available=", self.socket.bytesAvailable(), "< should be", size
+                #print "Alert: Waiting for data. Available=", self.socket.bytesAvailable(), "< should be", size
                 self.socket.waitForReadyRead()
 
         data = readStream.readQStringList()
@@ -47,7 +47,7 @@ class ClientConnection (QObject):
         upon the value of the header
         """
         header = dataPacket.takeFirst()
-        print header
+        print "Alert: Just Recieved :", header
         if (header == QString("m.FILE.CHANGED")):
             self.messageFileChangedRecieved.emit(dataPacket)
             #LATER: this should be connected to a slot which locks the file allowing no further get requests.
@@ -84,7 +84,7 @@ class ClientConnection (QObject):
 
     
     def writeOutgoing(self,data):
-        
+        print "Alert: Sending :", data.first()
         byteArray=QByteArray()
         writeStream=QDataStream (byteArray, QIODevice.WriteOnly)
         writeStream.setVersion(QDataStream.Qt_4_0)
@@ -98,8 +98,9 @@ class ClientConnection (QObject):
 class FssDirectoryManager(QObject):
     fileModified=pyqtSignal(QString)
     fileDeleted=pyqtSignal(QString)
+    hashValue = QCryptographicHash(QCryptographicHash.Md5)
     
-    fileHash={}
+    fileBuffer={}
     
     def __init__(self, directory):
         QObject.__init__(self)
@@ -130,14 +131,17 @@ class FssDirectoryManager(QObject):
             print "removing: ", i
   
         for i in newFiles:
+            self.loadFile(i)
             self.fileModified.emit(i)
             self.dirfiles.append(i)
             #self.watcher.addPath(i.fileName())
             print "appending: ", i
 
     def processFileChanged(self, changed):
+        
         print "Alert: File Changed :", changed
         fileName=QFileInfo(changed).fileName()
+        self.loadFile(fileName)
         self.fileModified.emit(fileName)
                 
     def displayChange(self, change):
@@ -146,18 +150,37 @@ class FssDirectoryManager(QObject):
     def writeRecievedModifications(self,dataPacket):
         fileName=dataPacket.takeFirst()
         fileData=dataPacket.takeFirst().toUtf8()
-        print "writing Recieved Data", fileName, fileData        
+        print "Alert :writing Recieved Data ", fileName, fileData        
         f = QFile(self.directory + '/'+ fileName)
         if(f.open(QIODevice.WriteOnly)):
             f.write(QByteArray.fromBase64(fileData))
         else:
-            print "couldn't open file: ", f.fileName()
+            print "Error: couldn't open file: ", f.fileName()
 
-    
     def getFileContents(self,fileName):
+        if(fileName not in self.fileBuffer):
+            print "Exception: ", fileName, " not in fileBuffer -> loading.."
+            self.loadFile(fileName)
+            print "Alert: loaded ", fileName
+        return self.fileBuffer[fileName][0]
+
+    def loadFile(self,fileName):
+        if(fileName in self.fileBuffer):
+            del self.fileBuffer[fileName]
         f = QFile(self.directory + '/' + fileName)
         if(f.open(QIODevice.ReadOnly)):
-            return(f.readAll())
+            fileContents=QString(f.readAll().toBase64())
+            self.hashValue.reset()
+            self.hashValue.addData(fileContents)
+            self.fileBuffer[fileName]=fileContents,QString(self.hashValue.result().toHex())
+            print "fileBuffer status: \n",self.fileBuffer
+            #print "Alert: Loaded :", self.fileBuffer[fileName]
         else:
             print "Error: couldn't open file: ", f.fileName()
-        return None
+
+    
+    def getFileHash(self,fileName):
+        if(fileName not in self.fileBuffer):
+            self.loadFile(fileName)
+        return self.fileBuffer[fileName][1]
+        
