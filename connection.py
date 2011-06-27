@@ -134,7 +134,7 @@ class FssDirectoryManager(QObject):
             self.loadFile(i)
             self.fileModified.emit(i)
             self.dirfiles.append(i)
-            #self.watcher.addPath(i.fileName())
+            self.watcher.addPath(self.directory + '/' + i)
             print "appending: ", i
 
     def processFileChanged(self, changed):
@@ -150,9 +150,10 @@ class FssDirectoryManager(QObject):
     def writeRecievedModifications(self,dataPacket):
         fileName=dataPacket.takeFirst()
         fileData=dataPacket.takeFirst().toUtf8()
-        print "Alert :writing Recieved Data ", fileName, fileData        
+
         f = QFile(self.directory + '/'+ fileName)
         if(f.open(QIODevice.WriteOnly)):
+            print "Alert :writing Recieved Data ", fileName, fileData
             f.write(QByteArray.fromBase64(fileData))
         else:
             print "Error: couldn't open file: ", f.fileName()
