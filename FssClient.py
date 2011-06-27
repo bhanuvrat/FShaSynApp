@@ -12,11 +12,12 @@ class FssClient (QObject):
             fileName=data.takeFirst()
             print "Requested File :", fileName
             fileData=self.fileMonitor.getFileContents(fileName)
-            dataPacket=QStringList()
-            dataPacket.append ("d.FILE.CHANGED")
-            dataPacket.append (fileName)
-            dataPacket.append (QString(fileData.toBase64()))        
-            self.connection.writeOutgoing(dataPacket)
+            if(file!=None):
+                dataPacket=QStringList()
+                dataPacket.append ("d.FILE.CHANGED")
+                dataPacket.append (fileName)
+                dataPacket.append (QString(fileData.toBase64()))        
+                self.connection.writeOutgoing(dataPacket)
 
 
         self.fileMonitor = FssDirectoryManager(homeDir);

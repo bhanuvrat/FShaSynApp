@@ -131,9 +131,11 @@ class FssDirectoryManager(QObject):
         for i in newFiles:
             self.fileModified.emit(i)
             self.dirfiles.append(i)
+            #self.watcher.addPath(i.fileName())
             print "appending: ", i
 
     def processFileChanged(self, changed):
+        print "Alert: File Changed :", changed
         self.fileModified.emit(changed)
                 
     def displayChange(self, change):
@@ -156,3 +158,4 @@ class FssDirectoryManager(QObject):
             return(f.readAll())
         else:
             print "Error: couldn't open file: ", f.fileName()
+        return None
