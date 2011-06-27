@@ -17,8 +17,8 @@ class ClientConnection (QObject):
         self.dataRecieved.connect(self.processHeader)
 
         self.messageFileChangedRecieved.connect(self.processMFileChangedRecieved)
-        self.requestFileChangedRecieved.connect(self.processRFileChangedRecieved)
-        self.dataFileChangedRecieved.connect(self.processDFileChangedRecieved)
+        #self.requestFileChangedRecieved.connect(self.processRFileChangedRecieved)
+        #self.dataFileChangedRecieved.connect(self.processDFileChangedRecieved)
         self.socket.disconnected.connect(self.emitDisconnected)
 
     def emitDisconnected(self):
@@ -47,7 +47,7 @@ class ClientConnection (QObject):
         upon the value of the header
         """
         header = dataPacket.takeFirst()
-
+        print header
         if (header == QString("m.FILE.CHANGED")):
             self.messageFileChangedRecieved.emit(dataPacket)
             #LATER: this should be connected to a slot which locks the file allowing no further get requests.
@@ -74,6 +74,7 @@ class ClientConnection (QObject):
     def processMFileChangedRecieved(self, data):
         #TO-DO:check if the file exists already
         #compare oldHash and newHash
+        print data.first()
         fileExists=True;
         if(fileExists):
             dataPacket=QStringList()
@@ -81,32 +82,7 @@ class ClientConnection (QObject):
             dataPacket.append(data.takeFirst())
             self.writeOutgoing(dataPacket)
 
-    def processRFileChangedRecieved(self, data):
-        fileName=data.takeFirst()
-        f = QFile(globalData.homeDir + '/' + fileName)        
-        if(f.open(QIODevice.ReadOnly)):            
-            fileData = f.readAll()
-            print fileData
-
-            dataPacket=QStringList()
-            dataPacket.append ("d.FILE.CHANGED")
-            dataPacket.append (fileName)
-            dataPacket.append (QString(fileData.toBase64()))        
-            
-            self.writeOutgoing(dataPacket)
-        else:
-            print "Error: Couldn't open File: ", f.fileName()
     
-    def processDFileChangedRecieved(self, data):
-        fileName=data.takeFirst()
-        fileData=data.takeFirst().toUtf8()
-        print fileData
-        f = QFile(globalData.homeDir + '/'+ fileName)
-        if(f.open(QIODevice.WriteOnly)):
-            f.write(QByteArray.fromBase64(fileData))
-        else:
-            print "couldn't open file: ", QFile.fileName()
-
     def writeOutgoing(self,data):
         
         byteArray=QByteArray()
@@ -138,7 +114,7 @@ class FssDirectoryManager(QObject):
         self.watcher.addPath(directory)
         self.watcher.directoryChanged.connect(self.processDirChanged)
 
-        self.watcher.fileChanged.connect(self.displayChange)
+        self.watcher.fileChanged.connect(self.processFileChanged)
         print list(self.watcher.directories())
         print list(self.watcher.files())
 
@@ -148,7 +124,7 @@ class FssDirectoryManager(QObject):
         newFiles = newlist - oldlist
         removedFiles = oldlist - newlist
         for i in removedFiles:
-            self.fileRemoved.emit(i)
+            self.fileDeleted.emit(i)
             self.dirfiles.remove(i);
             print "removing: ", i
   
@@ -161,7 +137,6 @@ class FssDirectoryManager(QObject):
     def processFileChanged(self, changed):
         print "Alert: File Changed :", changed
         self.fileModified.emit(changed)
-
                 
     def displayChange(self, change):
         print "changed ", change
@@ -184,4 +159,3 @@ class FssDirectoryManager(QObject):
         else:
             print "Error: couldn't open file: ", f.fileName()
         return None
-
