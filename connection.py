@@ -31,7 +31,7 @@ class ClientConnection (QObject):
             return
         size=readStream.readUInt16()
         for i in range(0,10):
-            if(self.socket.bytesAvailable() == size):
+            if(self.socket.bytesAvailable() >= size):
                 print 'Alert: got it'
                 break
             else:
@@ -92,6 +92,7 @@ class ClientConnection (QObject):
         writeStream.writeQStringList(data)
         writeStream.device().seek(0)
         writeStream.writeUInt16(byteArray.size() - 2)
+        print "Alert: writing to socket :", byteArray.size() ," bytes"
         self.socket.write(byteArray)
 
 class FssDirectoryManager(QObject):
@@ -136,7 +137,8 @@ class FssDirectoryManager(QObject):
 
     def processFileChanged(self, changed):
         print "Alert: File Changed :", changed
-        self.fileModified.emit(changed)
+        fileName=QFileInfo(changed).fileName()
+        self.fileModified.emit(fileName)
                 
     def displayChange(self, change):
         print "changed ", change
