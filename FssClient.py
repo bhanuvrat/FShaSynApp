@@ -8,6 +8,7 @@ class FssClient (QObject):
     def __init__(self, homeDir, serverAddr, serverPort=55441):
         QObject.__init__(self)
 
+<<<<<<< HEAD
         def processRFileChangedRecieved(data):
             fileName=data.takeFirst()
             print "Requested File :", fileName
@@ -20,16 +21,13 @@ class FssClient (QObject):
                 self.connection.writeOutgoing(dataPacket)
 
 
+=======
+>>>>>>> parent of ed9d4f1... new file interchange successful - modification unsuccessful
         self.fileMonitor = FssDirectoryManager(homeDir);
         self.clientSocket = QTcpSocket()
         self.clientSocket.connectToHost(QHostAddress(serverAddr), serverPort)
         self.connection = ClientConnection(self.clientSocket)
-        self.fileMonitor.fileModified.connect(self.connection.sendFileChangedMessage)
-        self.connection.requestFileChangedRecieved.connect(processRFileChangedRecieved)
-        
-        self.connection.dataFileChangedRecieved.connect( self.fileMonitor.writeRecievedModifications)
-
-
+        self.fileMonitor.fileModified.connect(self.connection.sendFileChangedMessage);
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description="FShSyServer")

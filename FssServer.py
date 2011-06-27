@@ -19,6 +19,7 @@ class FssCentralServer (QObject):
         def deleteConnection():
             self.connections.remove(clientConnection)
 
+<<<<<<< HEAD
         def processRFileChangedRecieved(data):
             fileName=data.takeFirst()
             fileData=self.fileMonitor.getFileContents(fileName)
@@ -29,14 +30,14 @@ class FssCentralServer (QObject):
                 dataPacket.append (QString(fileData.toBase64()))        
                 clientConnection.writeOutgoing(dataPacket)
 
+=======
+>>>>>>> parent of ed9d4f1... new file interchange successful - modification unsuccessful
         clientConnection=ClientConnection(self.centralServer.nextPendingConnection())
         clientConnection.disconnected.connect(deleteConnection)
         self.fileMonitor.fileModified.connect(clientConnection.sendFileChangedMessage)
-        clientConnection.dataFileChangedRecieved.connect( self.fileMonitor.writeRecievedModifications)
-        clientConnection.requestFileChangedRecieved.connect(processRFileChangedRecieved)
         self.connections.append(clientConnection)
-
-
+        
+        
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description="FShSyServer")
