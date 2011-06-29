@@ -1,5 +1,5 @@
 from PyQt4.Qt import *
-
+import traceback
 class ClientConnection (QObject):
     
     dataRecieved=pyqtSignal(QStringList)
@@ -109,9 +109,10 @@ class FssDirectoryManager(QObject):
         newFiles = newlist - oldlist
         removedFiles = oldlist - newlist
         for i in removedFiles:
-            self.fileDeleted.emit(i)
-            self.dirfiles.remove(i);
             print "removing: ", i
+            self.dirfiles.remove(i)
+            self.unLoadFile(i)
+            self.fileDeleted.emit(i)
   
         for i in newFiles:
             self.loadFile(i)
@@ -121,11 +122,13 @@ class FssDirectoryManager(QObject):
             print "appending: ", i
 
     def processFileChanged(self, changed):
-        
-        print "Alert: File Changed :", changed
-        fileName=QFileInfo(changed).fileName()
-        self.loadFile(fileName)
-        self.fileModified.emit(fileName)
+        fileName = QFileInfo(changed).fileName()
+        if (self.fileExists(fileName)):
+            
+            print "Alert: File Changed :", changed
+            fileName=QFileInfo(changed).fileName()
+            self.loadFile(fileName)
+            self.fileModified.emit(fileName)
                 
     def displayChange(self, change):
         print "changed ", change
@@ -133,7 +136,7 @@ class FssDirectoryManager(QObject):
     def writeRecievedModifications(self,dataPacket):
         fileName=dataPacket.takeFirst()
         fileData=dataPacket.takeFirst().toUtf8()
-
+        print "Alert: About to Write to file: ", fileName
         f = QFile(self.directory + '/'+ fileName)
         if(f.open(QIODevice.WriteOnly)):
             print "Alert :writing Recieved Data ", fileName, fileData
@@ -148,9 +151,17 @@ class FssDirectoryManager(QObject):
             print "Alert: loaded ", fileName
         return self.fileBuffer[fileName][0]
 
-    def loadFile(self,fileName):
+    def removeDeletedFile(self,fileName):
+        if(self.fileExists(fileName)):
+               QFile.remove(self.directory+ '/' + fileName);
+
+    def unLoadFile(self,fileName):
         if(fileName in self.fileBuffer):
             del self.fileBuffer[fileName]
+
+    def loadFile(self,fileName):
+        self.unLoadFile(fileName)
+
         f = QFile(self.directory + '/' + fileName)
         if(f.open(QIODevice.ReadOnly)):
             fileContents=QString(f.readAll().toBase64())
@@ -161,7 +172,8 @@ class FssDirectoryManager(QObject):
             #print "Alert: Loaded :", self.fileBuffer[fileName]
             return True
         else:
-            print "Error: couldn't open file: ", f.fileName()
+            print "Error: loadFile failed -> couldn't open  ", f.fileName()
+            traceback.print_list(traceback.extract_stack())
             return False
 
     
@@ -173,8 +185,10 @@ class FssDirectoryManager(QObject):
     def fileExists(self, fileName):
         if (fileName in self.fileBuffer):
             return True
-        else:
+        elif (QFile.exists(self.directory + '/' + fileName)):
             return self.loadFile(fileName)
+        else:
+            return False
 
     def getPeerName(self):
         return self.directory

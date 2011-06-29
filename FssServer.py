@@ -62,13 +62,25 @@ class FssCentralServer (QObject):
             dataPacket.append(fileHash)
             clientConnection.writeOutgoing(dataPacket)
 
+        def sendFileDeletedMessage(fileName):
+            dataPacket = QStringList()
+            dataPacket.append("m.FILE.DELETED")
+            dataPacket.append(fileName)
+            clientConnection.writeOutgoing(dataPacket)
+
+        def processMFileDeletedRecieved(data):
+            self.fileMonitor.removeDeletedFile(data.takeFirst())
+
+
         clientConnection=ClientConnection(self.centralServer.nextPendingConnection())
         clientConnection.disconnected.connect(deleteConnection)
         self.fileMonitor.fileModified.connect(sendFileChangedMessage)
+        self.fileMonitor.fileDeleted.connect(sendFileDeletedMessage)
         self.connections.append(clientConnection)
         clientConnection.dataFileChangedRecieved.connect( self.fileMonitor.writeRecievedModifications)
         clientConnection.requestFileChangedRecieved.connect(processRFileChangedRecieved)
         clientConnection.messageFileChangedRecieved.connect(processMFileChangedRecieved)
+        clientConnection.messageFileDeletedRecieved.connect(processMFileDeletedRecieved)
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description="FShSyServer")

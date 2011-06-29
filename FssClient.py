@@ -31,7 +31,13 @@ class FssClient (QObject):
             dataPacket.append(self.fileMonitor.getFileHash(fileName))
             print "Hash: ", self.fileMonitor.getFileHash(fileName)
             self.connection.writeOutgoing(dataPacket)
-
+            
+        def sendFileDeletedMessage(fileName):
+            dataPacket = QStringList()
+            dataPacket.append("m.FILE.DELETED")
+            dataPacket.append(fileName)
+            self.connection.writeOutgoing(dataPacket)
+            
         def processMFileChangedRecieved(data):
             #TO-DO:check if the file exists already
             #compare oldHash and newHash
@@ -51,16 +57,22 @@ class FssClient (QObject):
             dataPacket.append(fileHash)
             self.connection.writeOutgoing(dataPacket)
                 
-
+        def processMFileDeletedRecieved(data):
+            self.fileMonitor.removeDeletedFile(data.takeFirst())
+            
         self.fileMonitor = FssDirectoryManager(homeDir);
         self.clientSocket = QTcpSocket()
         self.clientSocket.connectToHost(QHostAddress(serverAddr), serverPort)
         self.connection = ClientConnection(self.clientSocket)
         self.fileMonitor.fileModified.connect(sendFileChangedMessage)
+        self.fileMonitor.fileDeleted.connect(sendFileDeletedMessage)
         self.connection.requestFileChangedRecieved.connect(processRFileChangedRecieved)
         
         self.connection.dataFileChangedRecieved.connect( self.fileMonitor.writeRecievedModifications)
         self.connection.messageFileChangedRecieved.connect(processMFileChangedRecieved)
+        self.connection.messageFileDeletedRecieved.connect(processMFileDeletedRecieved)
+        
+        
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description="FShSyServer")
