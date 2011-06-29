@@ -16,7 +16,7 @@ class ClientConnection (QObject):
         self.socket.readyRead.connect(self.readIncoming)
         self.dataRecieved.connect(self.processHeader)
 
-        self.messageFileChangedRecieved.connect(self.processMFileChangedRecieved)
+        #self.messageFileChangedRecieved.connect(self.processMFileChangedRecieved)
         #self.requestFileChangedRecieved.connect(self.processRFileChangedRecieved)
         #self.dataFileChangedRecieved.connect(self.processDFileChangedRecieved)
         self.socket.disconnected.connect(self.emitDisconnected)
@@ -47,7 +47,7 @@ class ClientConnection (QObject):
         upon the value of the header
         """
         header = dataPacket.takeFirst()
-        print "Alert: Just Recieved :", header
+        print "Alert: Just Recieved : ", header
         if (header == QString("m.FILE.CHANGED")):
             self.messageFileChangedRecieved.emit(dataPacket)
             #LATER: this should be connected to a slot which locks the file allowing no further get requests.
@@ -64,24 +64,6 @@ class ClientConnection (QObject):
         else:
             pass
 
-    def sendFileChangedMessage(self, fileName):
-        dataPacket = QStringList()
-        dataPacket.append("m.FILE.CHANGED")
-        dataPacket.append(fileName)
-
-        self.writeOutgoing(dataPacket)
-
-    def processMFileChangedRecieved(self, data):
-        #TO-DO:check if the file exists already
-        #compare oldHash and newHash
-        print data.first()
-        fileExists=True;
-        if(fileExists):
-            dataPacket=QStringList()
-            dataPacket.append("r.FILE.CHANGED");
-            dataPacket.append(data.takeFirst())
-            self.writeOutgoing(dataPacket)
-
     
     def writeOutgoing(self,data):
         print "Alert: Sending :", data.first()
@@ -94,6 +76,7 @@ class ClientConnection (QObject):
         writeStream.writeUInt16(byteArray.size() - 2)
         print "Alert: writing to socket :", byteArray.size() ," bytes"
         self.socket.write(byteArray)
+        self.socket.flush()  
 
 class FssDirectoryManager(QObject):
     fileModified=pyqtSignal(QString)
@@ -174,10 +157,12 @@ class FssDirectoryManager(QObject):
             self.hashValue.reset()
             self.hashValue.addData(fileContents)
             self.fileBuffer[fileName]=fileContents,QString(self.hashValue.result().toHex())
-            print "fileBuffer status: \n",self.fileBuffer
+            #print "fileBuffer status: \n",self.fileBuffer
             #print "Alert: Loaded :", self.fileBuffer[fileName]
+            return True
         else:
             print "Error: couldn't open file: ", f.fileName()
+            return False
 
     
     def getFileHash(self,fileName):
@@ -185,3 +170,11 @@ class FssDirectoryManager(QObject):
             self.loadFile(fileName)
         return self.fileBuffer[fileName][1]
         
+    def fileExists(self, fileName):
+        if (fileName in self.fileBuffer):
+            return True
+        else:
+            return self.loadFile(fileName)
+
+    def getPeerName(self):
+        return self.directory
