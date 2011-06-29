@@ -152,8 +152,12 @@ class FssDirectoryManager(QObject):
         return self.fileBuffer[fileName][0]
 
     def removeDeletedFile(self,fileName):
+        print "About to delete file: ", fileName
         if(self.fileExists(fileName)):
-               QFile.remove(self.directory+ '/' + fileName);
+            self.unLoadFile(fileName)
+            #self.dirfiles.remove(fileName)
+            #self.watcher.removePath(self.directory + '/' + fileName)
+            QFile.remove(self.directory+ '/' + fileName);
 
     def unLoadFile(self,fileName):
         if(fileName in self.fileBuffer):
@@ -176,7 +180,6 @@ class FssDirectoryManager(QObject):
             traceback.print_list(traceback.extract_stack())
             return False
 
-    
     def getFileHash(self,fileName):
         if(fileName not in self.fileBuffer):
             self.loadFile(fileName)
