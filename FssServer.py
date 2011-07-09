@@ -28,7 +28,7 @@ class FssCentralServer (QObject):
                 dataPacket=QStringList()
                 dataPacket.append ("d.FILE.CHANGED")
                 dataPacket.append (fileName)
-                dataPacket.append (fileData)        
+                dataPacket.append (fileData)
                 clientConnection.writeOutgoing(dataPacket)
 
         def sendFileChangedMessage(fileName):
@@ -71,16 +71,36 @@ class FssCentralServer (QObject):
         def processMFileDeletedRecieved(data):
             self.fileMonitor.removeDeletedFile(data.takeFirst())
 
+        def sendDirectoryCreatedMessage(relDirPath):
+            dataPacket = QStringList()
+            dataPacket.append("m.DIR.CREATED")
+            dataPacket.append(relDirPath)
+            clientConnection.writeOutgoing(dataPacket)
+            
+        def sendDirectoryDeletedMessage(relDirPath):
+            dataPacket = QStringList()
+            dataPacket.append("m.DIR.DELETED")
+            dataPacket.append(relDirPath)
+            clientConnection.writeOutgoing(dataPacket)
 
         clientConnection=ClientConnection(self.centralServer.nextPendingConnection())
         clientConnection.disconnected.connect(deleteConnection)
-        self.fileMonitor.fileModified.connect(sendFileChangedMessage)
-        self.fileMonitor.fileDeleted.connect(sendFileDeletedMessage)
-        self.connections.append(clientConnection)
-        clientConnection.dataFileChangedRecieved.connect( self.fileMonitor.writeRecievedModifications)
+
         clientConnection.requestFileChangedRecieved.connect(processRFileChangedRecieved)
         clientConnection.messageFileChangedRecieved.connect(processMFileChangedRecieved)
-        clientConnection.messageFileDeletedRecieved.connect(processMFileDeletedRecieved)
+        clientConnection.messageFileDeletedRecieved.connect(processMFileDeletedRecieved)        
+
+        clientConnection.messageDirectoryCreatedRecieved.connect(self.fileMonitor.createDirectory)
+        clientConnection.messageDirectoryDeletedRecieved.connect(self.fileMonitor.removeDirectory)
+        clientConnection.dataFileChangedRecieved.connect( self.fileMonitor.writeRecievedModifications)
+
+        self.fileMonitor.fileModified.connect(sendFileChangedMessage)
+        self.fileMonitor.fileDeleted.connect(sendFileDeletedMessage)
+        self.fileMonitor.directoryCreated.connect(sendDirectoryCreatedMessage)
+        self.fileMonitor.directoryDeleted.connect(sendDirectoryDeletedMessage)
+
+        self.connections.append(clientConnection)
+
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description="FShSyServer")

@@ -59,18 +59,36 @@ class FssClient (QObject):
                 
         def processMFileDeletedRecieved(data):
             self.fileMonitor.removeDeletedFile(data.takeFirst())
+
+        def sendDirectoryCreatedMessage(relDirPath):
+            dataPacket = QStringList()
+            dataPacket.append("m.DIR.CREATED")
+            dataPacket.append(relDirPath)
+            self.connection.writeOutgoing(dataPacket)
+            
+        def sendDirectoryDeletedMessage(relDirPath):
+            dataPacket = QStringList()
+            dataPacket.append("m.DIR.DELETED")
+            dataPacket.append(relDirPath)
+            self.connection.writeOutgoing(dataPacket)
             
         self.fileMonitor = FssDirectoryManager(homeDir);
         self.clientSocket = QTcpSocket()
         self.clientSocket.connectToHost(QHostAddress(serverAddr), serverPort)
         self.connection = ClientConnection(self.clientSocket)
+
         self.fileMonitor.fileModified.connect(sendFileChangedMessage)
         self.fileMonitor.fileDeleted.connect(sendFileDeletedMessage)
+        self.fileMonitor.directoryCreated.connect(sendDirectoryCreatedMessage)
+        self.fileMonitor.directoryDeleted.connect(sendDirectoryDeletedMessage)
+
         self.connection.requestFileChangedRecieved.connect(processRFileChangedRecieved)
-        
-        self.connection.dataFileChangedRecieved.connect( self.fileMonitor.writeRecievedModifications)
         self.connection.messageFileChangedRecieved.connect(processMFileChangedRecieved)
         self.connection.messageFileDeletedRecieved.connect(processMFileDeletedRecieved)
+
+        self.connection.dataFileChangedRecieved.connect( self.fileMonitor.writeRecievedModifications )
+        self.connection.messageDirectoryCreatedRecieved.connect( self.fileMonitor.createDirectory )
+        self.connection.messageDirectoryDeletedRecieved.connect( self.fileMonitor.removeDirectory)
         
         
 

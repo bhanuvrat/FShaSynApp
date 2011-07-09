@@ -8,6 +8,9 @@ class ClientConnection (QObject):
     messageFileDeletedRecieved=pyqtSignal(QStringList)
     requestFileChangedRecieved=pyqtSignal(QStringList)
     dataFileChangedRecieved=pyqtSignal(QStringList)
+    
+    messageDirectoryCreatedRecieved=pyqtSignal(QStringList)
+    messageDirectoryDeletedRecieved=pyqtSignal(QStringList)
 
     def __init__(self,socket):
         QObject.__init__(self)
@@ -60,6 +63,12 @@ class ClientConnection (QObject):
 
         elif (header == QString("d.FILE.CHANGED")):
             self.dataFileChangedRecieved.emit(dataPacket)
+
+        elif (header == QString("m.DIR.CREATED")):
+            self.messageDirectoryCreatedRecieved.emit(dataPacket)
+        
+        elif (header == QString("m.DIR.DELETED")):
+            self.messageDirectoryDeletedRecieved.emit(dataPacket)
               
         else:
             pass
@@ -81,117 +90,206 @@ class ClientConnection (QObject):
 class FssDirectoryManager(QObject):
     fileModified=pyqtSignal(QString)
     fileDeleted=pyqtSignal(QString)
+    directoryCreated=pyqtSignal(QString)
+    directoryDeleted=pyqtSignal(QString)
+
     hashValue = QCryptographicHash(QCryptographicHash.Md5)
     
     fileBuffer={}
     
+    def cacheRecursively(self, directory):
+        """
+        Recursively caches the whole diretory tree.
+        """
+        dirListing = list(QDir(directory).entryInfoList())
+        dirListing.pop(0)
+        dirListing.pop(0)
+        for i in dirListing:
+            self.watcher.addPath(i.absoluteFilePath())
+            #self.watcher.addPath(self.directory.relativeFilePath(i.absoluteFilePath()))
+            if (i.isDir()):
+                self.cacheRecursively(i.absoluteFilePath())
+
+    def uncacheRecursively(self, directory):
+        """
+        recursively removes the files and sub-directories of the passed path from watcher
+        """
+        dirListing = list(QDir(directory).entryInfoList())
+        dirListing.pop(0)
+        dirListing.pop(0)
+        for i in dirListing:
+            self.watcher.removePath(i.absoluteFilePath())
+            if (i.isDir()):
+                self.uncacheRecursively(i.absolutePath())
+        
+    def removeRecursively(self, directory):
+        """
+        Recursively deletes the files and sub-directories of passed directory
+        """
+        dirListing = list(QDir(directory).entryInfoList())
+        dirListing.pop(0)
+        dirListing.pop(0)
+        for i in dirListing:
+            self.watcher.removePath(i.absoluteFilePath())
+            if (i.isFile()):
+                self.unLoadFile(self.directory.relativeFilePath(i.absoluteFilePath()))
+                self.directory.remove(i.absoluteFilePath())
+            if (i.isDir()):
+                self.removeRecursively(i.absoluteFilePath())
+        
+        self.directory.rmdir(QDir(directory).absolutePath())
+
+    def relativeDirectoryPath(self, path):
+        return path.split(self.directory.absolutePath() + '/',QString.SkipEmptyParts).takeFirst()
+
     def __init__(self, directory):
         QObject.__init__(self)
-        self.directory= directory
-
+        self.directory= QDir(directory)
         self.watcher=QFileSystemWatcher()
-        self.dirfiles =list( QDir(self.directory))
+        self.watcher.addPath(self.directory.absolutePath())
+        self.cacheRecursively(self.directory.absolutePath())
 
-        for i in list(QDir(self.directory).entryInfoList()):
-            if(i.isFile()):
-                self.watcher.addPath(i.absoluteFilePath())
-                
-        self.watcher.addPath(directory)
+        """Connections"""
         self.watcher.directoryChanged.connect(self.processDirChanged)
-
         self.watcher.fileChanged.connect(self.processFileChanged)
-        print list(self.watcher.directories())
-        print list(self.watcher.files())
+        """printing the initial watch queue"""
+        for i in list(self.watcher.directories()):
+            print i
+        for i in list(self.watcher.files()):
+            print i
 
     def processDirChanged(self, changed):
-        newlist = set(list(QDir(self.directory)))
-        oldlist = set(self.dirfiles)
+        changedDir = QDir(changed)
+        print "Monitored directory changed: ", changed
+        if(changedDir.exists() == False):
+            """If the directory has been deleted then emit and return, no fooling around"""
+            #self.uncacheRecursively(changed)
+            self.directoryDeleted.emit(self.relativeDirectoryPath(changed))
+
+            self.watcher.removePath(changed)
+            if(changed in self.watcher.directories()): 
+                print"removePath failed"
+
+            print "Emitted Directory Deleted: ", self.relativeDirectoryPath(changed)
+            return
+
+        newlist = set()
+        eil = changedDir.entryInfoList()
+        eil.pop(0)
+        eil.pop(0)
+        for i in eil:
+            newlist.add(i.absoluteFilePath())
+
+        oldlist = set(self.watcher.files()).union(set(self.watcher.directories()))
         newFiles = newlist - oldlist
-        removedFiles = oldlist - newlist
-        for i in removedFiles:
-            print "removing: ", i
-            self.dirfiles.remove(i)
-            self.unLoadFile(i)
-            self.fileDeleted.emit(i)
-  
+
         for i in newFiles:
-            self.loadFile(i)
-            self.fileModified.emit(i)
-            self.dirfiles.append(i)
-            self.watcher.addPath(self.directory + '/' + i)
-            print "appending: ", i
+            self.watcher.addPath(i)
+            print "Appending to watch list: ", i
+            if(QFileInfo(i).isFile()):
+                self.loadFile(self.directory.relativeFilePath(i))
+                self.fileModified.emit(self.directory.relativeFilePath(i))
+            elif(QFileInfo(i).isDir()):
+                
+                self.directoryCreated.emit(self.relativeDirectoryPath(i))
+                print "Emitted Directory Created: ", self.relativeDirectoryPath(i)
+                pass
 
     def processFileChanged(self, changed):
-        fileName = QFileInfo(changed).fileName()
-        if (self.fileExists(fileName)):
-            
-            print "Alert: File Changed :", changed
-            fileName=QFileInfo(changed).fileName()
-            self.loadFile(fileName)
-            self.fileModified.emit(fileName)
-                
+        """changed is a QString with Absolute File Path"""
+        #changedFile = QFileInfo(changed)
+        relFilePath=self.directory.relativeFilePath(changed)
+        if (self.fileExists(relFilePath)):
+            print "Alert: modified :", relFilePath
+            #fileName=QFileInfo(changed).fileName()
+            self.loadFile(relFilePath)
+            self.fileModified.emit(relFilePath)
+        else:
+            """if the file is not there, it means it is deleted - hence the signal"""
+            print "Alert: Deleted", relFilePath
+            self.fileDeleted.emit(relFilePath)            
+
     def displayChange(self, change):
         print "changed ", change
 
     def writeRecievedModifications(self,dataPacket):
-        fileName=dataPacket.takeFirst()
+        relativeFilePath=dataPacket.takeFirst()
         fileData=dataPacket.takeFirst().toUtf8()
-        print "Alert: About to Write to file: ", fileName
-        f = QFile(self.directory + '/'+ fileName)
+        print "Alert: About to Write to file: ", relativeFilePath
+        f = QFile(self.directory.absolutePath() + '/' + relativeFilePath)
         if(f.open(QIODevice.WriteOnly)):
-            print "Alert :writing Recieved Data ", fileName, fileData
+            print "Alert :writing Recieved Data ",relativeFilePath, fileData
             f.write(QByteArray.fromBase64(fileData))
         else:
             print "Error: couldn't open file: ", f.fileName()
 
-    def getFileContents(self,fileName):
-        if(fileName not in self.fileBuffer):
-            print "Exception: ", fileName, " not in fileBuffer -> loading.."
-            self.loadFile(fileName)
-            print "Alert: loaded ", fileName
-        return self.fileBuffer[fileName][0]
+    def getFileContents(self,relFilePath):
+        if(relFilePath not in self.fileBuffer):
+            print "Exception: ", relFilePath, " not in fileBuffer -> loading.."
+            #error checking required here.
+            self.loadFile(relFilePath)            
+            print "Alert: loaded ", relFilePath
+        return self.fileBuffer[relFilePath][0]
 
-    def removeDeletedFile(self,fileName):
-        print "About to delete file: ", fileName
-        if(self.fileExists(fileName)):
-            self.unLoadFile(fileName)
-            #self.dirfiles.remove(fileName)
-            #self.watcher.removePath(self.directory + '/' + fileName)
-            QFile.remove(self.directory+ '/' + fileName);
+    def removeDeletedFile(self,relativeFilePath):
+        print "About to delete file: ", relativeFilePath
+        absoluteFilePath = self.directory.absolutePath() + '/'+ relativeFilePath
+        if(self.fileExists(relativeFilePath)):
+            self.unLoadFile(relativeFilePath)
+            QFile.remove(absoluteFilePath);
 
-    def unLoadFile(self,fileName):
-        if(fileName in self.fileBuffer):
-            del self.fileBuffer[fileName]
+    def unLoadFile(self,relFilePath):
+        """
+        assumes the parameter to be relative file path,
+        indexing in fileBuffer is based on relative file path.
+        """
+        if(relFilePath in self.fileBuffer):
+            del self.fileBuffer[relFilePath]
 
-    def loadFile(self,fileName):
-        self.unLoadFile(fileName)
+    def loadFile(self,relFilePath):
+        self.unLoadFile(relFilePath)
 
-        f = QFile(self.directory + '/' + fileName)
+        f = QFile(self.directory.absolutePath() + '/' + relFilePath)
         if(f.open(QIODevice.ReadOnly)):
             fileContents=QString(f.readAll().toBase64())
             self.hashValue.reset()
             self.hashValue.addData(fileContents)
-            self.fileBuffer[fileName]=fileContents,QString(self.hashValue.result().toHex())
+            self.fileBuffer[relFilePath]=fileContents,QString(self.hashValue.result().toHex())
             #print "fileBuffer status: \n",self.fileBuffer
             #print "Alert: Loaded :", self.fileBuffer[fileName]
             return True
         else:
-            print "Error: loadFile failed -> couldn't open  ", f.fileName()
+            print "Error: loadFile failed -> couldn't open: ", f.fileName()
             traceback.print_list(traceback.extract_stack())
             return False
 
-    def getFileHash(self,fileName):
-        if(fileName not in self.fileBuffer):
-            self.loadFile(fileName)
-        return self.fileBuffer[fileName][1]
+    def getFileHash(self,relFilePath):
+        if(relFilePath not in self.fileBuffer):
+            self.loadFile(relFilePath)
+        return self.fileBuffer[relFilePath][1]
         
-    def fileExists(self, fileName):
-        if (fileName in self.fileBuffer):
+    def fileExists(self, relFilePath):
+        exists = QFile.exists(self.directory.absolutePath() + '/' + relFilePath)
+        if (exists and  relFilePath in self.fileBuffer):
             return True
-        elif (QFile.exists(self.directory + '/' + fileName)):
-            return self.loadFile(fileName)
+        elif (exists):
+            return self.loadFile(relFilePath)
         else:
             return False
 
+    def createDirectory(self, dataPacket):
+        self.directory.mkdir(dataPacket.takeFirst())
+
+    def removeDirectory(self,dataPacket):        
+        dirToRemove=QDir(self.directory.absolutePath() + '/' + dataPacket.takeFirst())
+        print "dirToRemove: ", dirToRemove.absolutePath()
+
+        if(dirToRemove.exists()):
+            print "Deleting directory "
+            self.removeRecursively(dirToRemove)
+            self.directory.rmdir(dirToRemove.absolutePath())
+        else :
+            print "directory did not exist"
+        
     def getPeerName(self):
-        return self.directory
+        return self.directory.absolutePath()
